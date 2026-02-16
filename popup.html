@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HR Portal Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app" class="app-container">
+      <!-- Top Navigation / Application Header -->
+      <header class="app-header">
+        <div class="header-container">
+          <div class="logo-area">
+            <span class="logo-text">HR Portal</span>
+          </div>
+          <div class="header-controls">
+            <div class="theme-toggle" id="theme-btn" title="Switch Theme">
+              <div class="toggle-track">
+                <div class="toggle-thumb">
+                  <!-- Moon SVG -->
+                  <svg
+                    class="icon-moon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
+                    ></path>
+                  </svg>
+                  <!-- Sun SVG -->
+                  <svg
+                    class="icon-sun"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="4.22" x2="19.78" y2="5.64"></line>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Profile Overview (Dashboard only) -->
+        <div id="profile-strip" class="profile-strip hide">
+          <div class="user-meta">
+            <div class="avatar-placeholder">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </div>
+            <span id="user-display" class="username">Employee</span>
+          </div>
+          <button id="logout-btn" class="logout-btn">Sign Out</button>
+        </div>
+      </header>
+
+      <!-- Dynamic Content Area -->
+      <main class="content-area">
+        <!-- Login State -->
+        <section id="login-view" class="view">
+          <div class="auth-box">
+            <div class="auth-header">
+              <h2>Portal Authentication</h2>
+              <p>Enter your credentials to manage your time logs</p>
+            </div>
+            <div class="form-fields">
+              <div class="input-group">
+                <label for="email">Corporate Email</label>
+                <input
+                  type="email"
+                  id="email"
+                  placeholder="name@company.com"
+                  required
+                />
+              </div>
+              <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" required />
+              </div>
+              <div class="input-group checkbox-group">
+                <input type="checkbox" id="remember-me" />
+                <label for="remember-me">Remember Me</label>
+              </div>
+              <button id="login-btn" class="btn-primary">Authenticate</button>
+              <p id="login-error" class="error-msg hide"></p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Dashboard State -->
+        <section id="dashboard-view" class="view hide">
+          <div class="tracking-card">
+            <div class="tracking-header">
+              <div class="status-badge">
+                <span id="status-dot" class="status-dot active"></span>
+                <span id="status-text" class="status-text">Online</span>
+              </div>
+              <h3>Attendance Timer</h3>
+            </div>
+            <div class="timer-display">
+              <div id="timer" class="timer-value">00:00:00</div>
+              <span class="timer-unit">Elapsed Time</span>
+            </div>
+          </div>
+
+          <div class="action-grid">
+            <button id="punch-btn" class="btn-punch">Punch In</button>
+          </div>
+
+          <div class="history-module">
+            <div class="module-header">
+              <h4>Recent Activity Log</h4>
+            </div>
+            <div id="history-list" class="log-entries">
+              <div class="empty-log">No activity found for current session</div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <div id="status-msg" class="toast-notification"></div>
+
+      <footer class="app-footer">
+        <p>&copy; 2026 Enterprise HR Systems</p>
+      </footer>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>

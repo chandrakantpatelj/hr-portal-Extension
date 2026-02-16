@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "HR Admin Punch Assistant",
+  "version": "1.0",
+  "description": "Punch in/out and track your shift directly from your browser.",
+  "permissions": ["storage", "alarms"],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "host_permissions": ["<all_urls>"]
+}
