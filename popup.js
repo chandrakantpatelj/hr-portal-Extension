@@ -4,7 +4,7 @@
 
     // --- Configuration & State ---
     let timerInterval = null;
-    const API_BASE = 'http://hr-portal.jspinfotech.com/api/v1';
+    const API_BASE = 'https://hr-portal.jspinfotech.com/api/v1';
     const PUNCH_DELAY_MS = 2 * 60 * 60 * 1000; // 2 Hours
 
     // --- DOM Accessors ---
@@ -103,7 +103,7 @@
             formData.append('email', email);
             formData.append('password', password);
 
-            const response = await fetch('https://hr-portal.jspinfotech.com/api/v1/login', {
+            const response = await fetch(`${API_BASE}/login`, {
                 method: 'POST',
                 body: formData
             });
@@ -130,11 +130,11 @@
                 updatePunchUI(false);
                 showToast('Welcome back');
             } else {
-                showToast(result.message || 'Login failed. Check credentials.');
+                showError(result.message || 'Login failed. Check credentials.');
             }
         } catch (e) {
             console.error('Login Error:', e);
-            showToast('Connection error during login.');
+            showError('Connection error during login.');
         } finally {
             setLoading(nodes.loginBtn, false, 'Authenticate');
         }
@@ -147,7 +147,7 @@
             try {
                 setLoading(nodes.logoutBtn, true);
                 // Notifying server of logout
-                await fetch('http://hr-portal.jspinfotech.com/api/v1/logout', {
+                await fetch(`${API_BASE}/logout`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${data.token}`,
@@ -161,7 +161,8 @@
             }
         }
 
-        await chrome.storage.local.clear();
+        // Targeted removal of authentication state instead of clearing everything
+        await chrome.storage.local.remove(['token', 'user', 'punchInTime']);
         stopTimer();
         transitionToView('login');
         showToast('Logged out successfully');
@@ -393,19 +394,35 @@
                         }
                     }
 
-                    // If server says punched in but we don't have local time, 
-                    // we try to parse server time or use current time as fallback for timer.
+                    // Robust Parsing for serverTime
                     if (!startTime && serverPunchInTime) {
-                        // Very basic parsing for "HH:MM:SS AM/PM"
-                        const [time, modifier] = serverPunchInTime.split(' ');
-                        let [hours, minutes, seconds] = time.split(':');
-                        if (hours === '12') hours = '00';
-                        if (modifier === 'PM') hours = parseInt(hours, 10) + 12;
+                        try {
+                            // Try parsing serverPunchInTime (it might be "10:16:29 AM" or a full ISO string)
+                            // If it's just time, we assume it's for today.
+                            let parsedTime;
+                            if (serverPunchInTime.includes(':')) {
+                                const today = new Date();
+                                const timeStr = serverPunchInTime.match(/(\d{1,2}):(\d{1,2}):(\d{1,2})(?:\s*(AM|PM))?/i);
+                                if (timeStr) {
+                                    let [_, hours, minutes, seconds, modifier] = timeStr;
+                                    hours = parseInt(hours, 10);
+                                    minutes = parseInt(minutes, 10);
+                                    seconds = parseInt(seconds, 10);
+                                    if (modifier) {
+                                        if (modifier.toUpperCase() === 'PM' && hours < 12) hours += 12;
+                                        if (modifier.toUpperCase() === 'AM' && hours === 12) hours = 0;
+                                    }
+                                    today.setHours(hours, minutes, seconds, 0);
+                                    parsedTime = today.getTime();
+                                }
+                            }
 
-                        const serverTime = new Date();
-                        serverTime.setHours(hours, minutes, seconds, 0);
-                        startTime = serverTime.getTime();
-                        await chrome.storage.local.set({ punchInTime: startTime });
+                            startTime = parsedTime || Date.now();
+                            await chrome.storage.local.set({ punchInTime: startTime });
+                        } catch (parseError) {
+                            console.error('Failed to parse server time:', serverPunchInTime, parseError);
+                            startTime = Date.now();
+                        }
                     }
 
                     if (startTime) {
