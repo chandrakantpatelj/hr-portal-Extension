@@ -243,33 +243,112 @@
             formData.append('type', type);
             formData.append('timestamp', Math.floor(now / 1000));
 
+            console.log('Sending punch request:', { type, timestamp: Math.floor(now / 1000) });
+            
             const response = await apiFetch('/punch/action', {
                 method: 'POST',
                 body: formData
             });
+            
+            console.log('Punch response status:', response.status, response.statusText);
 
-            const result = await response.json();
+            // Get response text first, then try to parse as JSON
+            const responseText = await response.text();
+            let result;
+            try {
+                result = JSON.parse(responseText);
+            } catch (jsonError) {
+                console.error('Failed to parse response as JSON:', jsonError);
+                console.error('Response text:', responseText);
+                console.error('Response status:', response.status, response.statusText);
+                showToast(`Server error: ${response.status} ${response.statusText}`);
+                return;
+            }
 
-            if (response.ok && result.status === 'success') {
+            // Log the full response for debugging
+            console.log('Punch API response:', result);
+            console.log('Response status:', response.status, response.ok);
+            console.log('Result status:', result.status);
+            console.log('Result keys:', Object.keys(result));
+
+            // Check if there's an explicit error in the response
+            const hasError = result.error || (result.message && result.message.toLowerCase().includes('error')) || 
+                           (result.status && result.status.toLowerCase() === 'error');
+
+            // Check for explicit success indicators - prioritize status === 'success'
+            const isSuccess = result.status === 'success' || result.success === true || 
+                            (result.data && result.data.status === 'success');
+
+            console.log('Success check:', {
+                hasError: hasError,
+                isSuccess: isSuccess,
+                resultStatus: result.status,
+                responseOk: response.ok,
+                responseStatus: response.status
+            });
+
+            // If response is 200 OK and (explicit success OR no explicit error), treat as success
+            if (response.ok && response.status === 200 && (isSuccess || !hasError)) {
+                console.log('✓ Punch action successful (200 OK), updating UI...');
+                console.log('Punch type:', type, 'Timestamp:', now);
+                
+                // Update UI based on punch type
                 if (type === 'in') {
+                    console.log('→ Setting punchInTime to:', now);
                     await chrome.storage.local.set({ punchInTime: now });
+                    
+                    // Verify it was set
+                    const verify = await chrome.storage.local.get('punchInTime');
+                    console.log('→ Verified punchInTime in storage:', verify.punchInTime);
+                    
+                    console.log('→ Starting timer with time:', now);
                     startTimer(now);
+                    
+                    console.log('→ Updating UI to punched in state');
                     updatePunchUI(true, now);
-                    showToast('Punched In Successfully');
+                    
+                    // Verify UI was updated
+                    console.log('→ UI Update verification:', {
+                        buttonText: nodes.punchBtn?.textContent,
+                        statusText: nodes.statusText?.textContent,
+                        statusDotActive: nodes.statusDot?.classList.contains('active'),
+                        timerDisplay: nodes.timerDisplay?.textContent
+                    });
+                    
+                    showToast(result.message || 'Punched In Successfully');
                 } else {
+                    console.log('→ Removing punchInTime, updating UI to punched out');
                     await chrome.storage.local.remove('punchInTime');
                     stopTimer();
                     updatePunchUI(false);
-                    showToast('Punched Out Successfully');
+                    showToast(result.message || 'Punched Out Successfully');
                 }
-                await fetchStatus();
-                await fetchHistory();
+                
+                // Only fetch history, don't fetch status (it might overwrite our state)
+                // The status is already updated by our UI changes above
+                try {
+                    await fetchHistory();
+                    console.log('→ History refreshed successfully');
+                } catch (syncError) {
+                    console.error('Error syncing history after punch:', syncError);
+                    // Don't fail the punch action if sync fails
+                }
             } else {
-                showToast(result.message || 'Action failed');
+                // Handle error case
+                const errorMsg = result.message || result.error || result.msg || `Action failed (${response.status})`;
+                console.error('✗ Punch action failed:', {
+                    status: response.status,
+                    response: result,
+                    hasError: hasError,
+                    isSuccess: isSuccess
+                });
+                showToast(errorMsg);
             }
         } catch (e) {
             console.error('Punch Error:', e);
-            showToast('Sync Error');
+            // Show more detailed error message
+            const errorMsg = e.message || 'Network error. Please check your connection.';
+            showToast(`Punch failed: ${errorMsg}`);
         } finally {
             setLoading(nodes.punchBtn, false, isPunchedIn ? 'Punch Out' : 'Punch In');
         }
@@ -277,8 +356,18 @@
 
     // --- UI State Helpers ---
     const updatePunchUI = (active, punchInTime) => {
-        if (!nodes.punchBtn) return;
+        console.log('updatePunchUI called with:', { active, punchInTime, nodesExist: !!nodes.punchBtn });
+        
+        if (!nodes.punchBtn) {
+            console.error('Punch button node not found!');
+            return;
+        }
 
+        console.log('Updating button:', { 
+            currentText: nodes.punchBtn.textContent,
+            newText: active ? 'Punch Out' : 'Punch In'
+        });
+        
         nodes.punchBtn.textContent = active ? 'Punch Out' : 'Punch In';
         nodes.punchBtn.className = `btn-punch ${active ? 'out' : 'in'}`;
 
@@ -297,10 +386,31 @@
             nodes.punchBtn.title = '';
         }
 
-        if (nodes.statusDot) nodes.statusDot.classList.toggle('active', active);
-        if (nodes.statusText) nodes.statusText.textContent = active ? 'Online' : 'Offline';
+        console.log('Updating status:', { 
+            statusDotExists: !!nodes.statusDot,
+            statusTextExists: !!nodes.statusText,
+            active: active
+        });
+        
+        if (nodes.statusDot) {
+            if (active) {
+                nodes.statusDot.classList.add('active');
+            } else {
+                nodes.statusDot.classList.remove('active');
+            }
+            console.log('Status dot classes:', nodes.statusDot.className);
+        }
+        
+        if (nodes.statusText) {
+            nodes.statusText.textContent = active ? 'Online' : 'Offline';
+            console.log('Status text set to:', nodes.statusText.textContent);
+        }
 
-        if (!active && nodes.timerDisplay) nodes.timerDisplay.textContent = '00:00:00';
+        if (!active && nodes.timerDisplay) {
+            nodes.timerDisplay.textContent = '00:00:00';
+        }
+        
+        console.log('UI update complete');
     };
 
     const renderHistory = (history) => {
@@ -339,23 +449,47 @@
             throw new Error('No token found');
         }
 
+        // Build headers - don't set Content-Type for FormData (browser sets it automatically)
         const headers = {
             'Authorization': `Bearer ${data.token}`,
             'Accept': 'application/json',
             ...options.headers
         };
 
-        const response = await fetch(`${API_BASE}${endpoint}`, {
-            ...options,
-            headers
-        });
-
-        if (response.status === 401) {
-            handleLogout();
-            throw new Error('Session expired');
+        // If body is FormData, don't set Content-Type header (browser will set it with boundary)
+        if (options.body instanceof FormData) {
+            delete headers['Content-Type'];
         }
 
-        return response;
+        try {
+            console.log(`Making API request to: ${API_BASE}${endpoint}`, {
+                method: options.method || 'GET',
+                hasBody: !!options.body,
+                headers: headers
+            });
+            
+            const response = await fetch(`${API_BASE}${endpoint}`, {
+                ...options,
+                headers
+            });
+
+            console.log(`API response for ${endpoint}:`, {
+                status: response.status,
+                statusText: response.statusText,
+                ok: response.ok
+            });
+
+            if (response.status === 401) {
+                handleLogout();
+                throw new Error('Session expired');
+            }
+
+            return response;
+        } catch (error) {
+            console.error(`API Fetch Error for ${endpoint}:`, error);
+            // Re-throw with more context
+            throw new Error(`Network request failed: ${error.message}`);
+        }
     };
 
     const fetchMe = async () => {
@@ -454,16 +588,32 @@
     };
 
     const startTimer = (startTime) => {
-        if (timerInterval) clearInterval(timerInterval);
+        console.log('startTimer called with:', startTime);
+        console.log('Current time:', Date.now());
+        console.log('Timer display node exists:', !!nodes.timerDisplay);
+        
+        if (timerInterval) {
+            console.log('Clearing existing timer interval');
+            clearInterval(timerInterval);
+        }
+        
         const update = () => {
             const diff = Date.now() - startTime;
             const h = String(Math.floor(diff / 3600000)).padStart(2, '0');
             const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
             const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
-            if (nodes.timerDisplay) nodes.timerDisplay.textContent = `${h}:${m}:${s}`;
+            const timeString = `${h}:${m}:${s}`;
+            
+            if (nodes.timerDisplay) {
+                nodes.timerDisplay.textContent = timeString;
+            } else {
+                console.error('Timer display node not found!');
+            }
         };
-        update();
+        
+        update(); // Update immediately
         timerInterval = setInterval(update, 1000);
+        console.log('Timer started, interval ID:', timerInterval);
     };
 
     const stopTimer = () => {
