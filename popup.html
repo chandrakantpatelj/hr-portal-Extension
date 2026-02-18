@@ -103,13 +103,25 @@
                 <input
                   type="email"
                   id="email"
+                  name="email"
+                  autocomplete="username"
+                  inputmode="email"
+                  autocapitalize="none"
+                  spellcheck="false"
                   placeholder="name@company.com"
                   required
                 />
               </div>
               <div class="input-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" required />
+                <input
+                  type="password"
+                  id="password"
+                  name="password"
+                  autocomplete="current-password"
+                  spellcheck="false"
+                  required
+                />
               </div>
               <div class="input-group checkbox-group">
                 <input type="checkbox" id="remember-me" />
